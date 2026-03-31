@@ -45,3 +45,7 @@ htmlcov/
 *.bak
 *.bak2
 *.old
+
+# OMC state files
+.omc/
+*.jsonl
