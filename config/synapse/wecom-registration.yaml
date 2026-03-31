@@ -1,0 +1,32 @@
+# 企业微信桥接器 AppService 注册文件
+# 这是 Matrix AppService 模式的核心配置
+
+id: wecom  # 必须是字符串，不是数字
+
+# AppService 服务地址
+url: "http://wecom-bridge:8000"
+
+# Token 配置（从环境变量读取）
+as_token: "${AS_TOKEN}"
+hs_token: "${HS_TOKEN}"
+
+# 桥接器默认发送者
+sender_localpart: wecom_bridge
+
+# 命名空间配置
+namespaces:
+  users:
+    # 虚拟用户模式：@wecom_*:matrix.example.com
+    - regex: "^@wecom_.*:matrix\\.example\\.com$"
+      exclusive: true  # 独占，其他用户不能用此模式
+  rooms: []  # 不独占房间
+  aliases: []  # 不独占别名
+
+# 协议配置（显式声明）
+protocols: []
+
+# 限流配置
+rate_limited: false  # 桥接器必须关闭限流
+
+# 启用状态
+enabled: true

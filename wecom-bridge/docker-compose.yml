@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # ============================================================
+  # 桥接服务
+  # ============================================================
+  bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wecom-bridge
+    environment:
+      - DATABASE_URL=postgresql://wecom:wecom_password@postgres-wecom/wecom
+      - MATRIX_HOMESERVER=http://synapse:8008
+      - MATRIX_DOMAIN=matrix.example.com
+      - AS_TOKEN=${AS_TOKEN}
+      - HS_TOKEN=${HS_TOKEN}
+      - WECOMP_CORP_ID=${WECOMP_CORP_ID}
+      - WECOMP_SECRET=${WECOMP_SECRET}
+      - WECOMP_AGENT_ID=${WECOMP_AGENT_ID:-1000001}
+      - WECOMP_TOKEN=${WECOMP_TOKEN}
+      - WECOMP_ENCODING_AES_KEY=${WECOMP_ENCODING_AES_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres-wecom:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/app/migrations:ro
+    networks:
+      - wecom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================
+  # PostgreSQL 数据库
+  # ============================================================
+  postgres-wecom:
+    image: postgres:15-alpine
+    container_name: postgres-wecom
+    environment:
+      - POSTGRES_USER=wecom
+      - POSTGRES_PASSWORD=wecom_password
+      - POSTGRES_DB=wecom
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - wecom-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wecom"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  wecom-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

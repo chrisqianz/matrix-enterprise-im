@@ -1,0 +1,61 @@
+# Matrix Synapse 服务器配置
+# 企业自建 IM 核心配置（AppService 模式）
+
+server_name: "matrix.example.com"
+
+# ==================== 监听配置 ====================
+listeners:
+  - port: 8008
+    type: http
+    resources:
+      - names: [client, federation]
+    x_forwarded: true  # Nginx 反向代理需要
+
+# ==================== 信任反向代理 ====================
+trusted_reverse_proxy: true
+trusted_proxies:
+  - 172.18.0.0/16  # Docker bridge 网络
+
+# ==================== 数据库配置 ====================
+database:
+  name: psycopg2
+  args:
+    user: matrix
+    password: ${POSTGRES_PASSWORD}
+    database: matrix
+    host: postgres
+    cp_min: 5
+    cp_max: 10
+
+# ==================== AppService 配置 ====================
+registration_shared_secret: "${REGISTRATION_SHARED_SECRET}"
+app_service_config_files:
+  - /data/wecom-registration.yaml
+
+# ==================== 注册配置 ====================
+enable_registration: false  # 生产环境关闭注册
+enable_registration_captcha: false
+
+# 管理员账号
+admin_users:
+  - "@admin:matrix.example.com"
+
+# ==================== 联邦配置 ====================
+federation_domain_whitelist: []  # 单服务器可留空
+
+# ==================== 媒体配置 ====================
+media:
+  media_store_path: /data/media
+  upload_size_limit: 100M
+
+# ==================== 速率限制 ====================
+ratelimiting:
+  registrations_per_ip: 10
+  message_per_second: 100
+  burst_count: 50
+
+# ==================== 信任密钥服务器 ====================
+trusted_key_servers: []
+
+# ==================== 日志配置 ====================
+# log_config: /data/log.yaml  # 或用默认配置

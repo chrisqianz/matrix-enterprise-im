@@ -1,0 +1,124 @@
+# Matrix 企业自建 IM 完整部署方案
+# 包含：Synapse、Element、企业微信桥接、Nginx 反向代理
+# 版本：2.0（AppService 模式）
+
+version: '3.9'
+
+services:
+  # ================= Matrix Homeserver =================
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse
+    restart: unless-stopped
+    volumes:
+      - ./data/synapse:/data
+      - ./config/synapse/homeserver.yaml:/data/homeserver.yaml:ro
+      - ./config/synapse/wecom-registration.yaml:/data/wecom-registration.yaml:ro
+    environment:
+      - SYNAPSE_SERVER_NAME=matrix.example.com
+      - SYNAPSE_REPORT_STATS=no
+      - REGISTRATION_SHARED_SECRET=${REGISTRATION_SHARED_SECRET}
+    depends_on:
+      - postgres
+    networks:
+      - matrix
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8008/_matrix/client/versions || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ================= Matrix 数据库 =================
+  postgres:
+    image: postgres:15-alpine
+    container_name: matrix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: matrix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: matrix
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_WORK_MEM: 16MB
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - matrix
+
+  # ================= Element Web 客户端 =================
+  element:
+    image: vectorim/element-web:latest
+    container_name: element
+    restart: unless-stopped
+    volumes:
+      - ./config/element/config.json:/app/config.json:ro
+    networks:
+      - matrix
+
+  # ================= 企业微信桥接服务（AppService） =================
+  wecom-bridge:
+    build: 
+      context: ./wecom-bridge
+      dockerfile: Dockerfile
+    container_name: wecom-bridge
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://wecom:wecom_pass@wecom-db/wecom
+      - MATRIX_HOMESERVER=http://synapse:8008
+      - MATRIX_DOMAIN=matrix.example.com
+      - WECOMP_CORP_ID=${WECOMP_CORP_ID}
+      - WECOMP_SECRET=${WECOMP_SECRET}
+      - WECOMP_AGENT_ID=${WECOMP_AGENT_ID}
+      # AppService 配置
+      - AS_TOKEN=${AS_TOKEN}
+      - HS_TOKEN=${HS_TOKEN}
+      - AS_HOST=http://wecom-bridge:8000
+      - AS_PORT=8000
+    depends_on:
+      - synapse
+      - wecom-db
+    networks:
+      - matrix
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ================= 企业微信桥接数据库 =================
+  wecom-db:
+    image: postgres:15-alpine
+    container_name: wecom-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: wecom
+      POSTGRES_PASSWORD: ${WECOMP_DB_PASSWORD}
+      POSTGRES_DB: wecom
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_WORK_MEM: 16MB
+    volumes:
+      - ./data/wecom-db:/var/lib/postgresql/data
+    networks:
+      - matrix
+
+  # ================= Nginx 反向代理 =================
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx:/etc/nginx/conf.d:ro
+      - ./certs:/etc/letsencrypt:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - synapse
+      - element
+      - wecom-bridge
+    networks:
+      - matrix
+
+networks:
+  matrix:
+    driver: bridge
