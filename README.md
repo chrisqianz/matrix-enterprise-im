@@ -149,7 +149,6 @@ python-multipart==0.0.6
 如有问题，请通过以下方式联系我们：
 
 - [GitHub Issues](https://github.com/your-username/matrix-enterprise-im/issues)
-- Email: your-email@example.com
 
 ## Star History
 
