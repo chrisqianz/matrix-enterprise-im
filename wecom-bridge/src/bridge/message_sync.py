@@ -516,20 +516,44 @@ class MessageSyncManager:
         Returns:
             dict: 映射信息或 None
         """
-        # TODO: 实现消息映射存储
+        # 使用 user_mapper 查找映射记录
+        mapping = await self.puppet_manager.user_mapper.get_message_mapping(matrix_event_id)
+        if mapping:
+            return {
+                "id": mapping.id,
+                "matrix_event_id": mapping.matrix_event_id,
+                "matrix_room_id": mapping.matrix_room_id,
+                "matrix_sender": mapping.matrix_sender,
+                "wecom_msg_id": mapping.wecom_msg_id,
+                "wecom_conversation_id": mapping.wecom_conversation_id,
+                "direction": mapping.direction,
+                "status": mapping.status,
+                "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
+                "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None,
+            }
         return None
     
     async def track_message_delivery(
         self,
         matrix_event_id: str,
-        wecom_msg_id: Optional[str] = None
+        wecom_msg_id: Optional[str] = None,
+        status: str = "success"
     ):
         """
         跟踪消息投递状态
-        
+
         Args:
             matrix_event_id: Matrix 事件 ID
             wecom_msg_id: 企业微信消息 ID
+            status: 状态（pending/success/failed）
         """
-        # TODO: 实现消息状态跟踪
-        logger.debug(f"跟踪消息投递：matrix={matrix_event_id}, wecom={wecom_msg_id}")
+        # 通过 user_mapper 更新数据库状态
+        await self.puppet_manager.user_mapper.update_message_status(
+            matrix_event_id=matrix_event_id,
+            status=status
+        )
+        if wecom_msg_id:
+            logger.debug(f"消息 {matrix_event_id} 投递状态更新为 {status} (wecom_id={wecom_msg_id})")
+
+        logger.debug(f"跟踪消息投递：matrix={matrix_event_id}, status={status}")
+

@@ -485,12 +485,40 @@ async def handle_matrix_message(event: TransactionEvent):
 
 
 async def handle_matrix_member_event(event: TransactionEvent):
-    """处理 Matrix 成员事件"""
-    logger.info(f"成员事件：room={event.room_id}, state_key={event.state_key}, type={event.type}")
-    
-    # TODO: 实现成员同步逻辑
-    # - 用户加入/退出房间
-    # - 同步到企业微信（如果有需要）
+    """处理 Matrix 成员事件 (同步成员状态到桥接状态)"""
+    room_id = event.room_id
+    state_key = event.state_key
+    membership = event.content.get("membership")
+
+    logger.info(f"成员事件：room={room_id}, user={state_key}, membership={membership}")
+
+    if not membership:
+        return
+
+    # 只有当桥接用户（Puppet）的状态变化时，才需要更新 Portal 状态
+    if not (state_key.startswith("@wecom_") or state_key.startswith("@wecom_ext_")):
+        logger.debug(f"忽略非桥接用户成员事件：{state_key}")
+        return
+
+    # 获取该房间对应的 Portal 映射
+    portal = await app.state.portal_manager.get_portal_by_room(room_id)
+    if not portal:
+        logger.debug(f"该房间没有 Portal 映射，忽略成员事件：{room_id}")
+        return
+
+    # 如果当前事件的用户正是该 Portal 的 Puppet 用户
+    if state_key == portal.puppet_user_id:
+        if membership in ["leave", "kick"]:
+            logger.info(f"Puppet 用户 {state_key} 离开房间 {room_id}，禁用 Portal")
+            await app.state.portal_manager.soft_delete_portal(
+                conversation_id=portal.conversation_id,
+                reason=f"User {state_key} {membership}ed from room"
+            )
+        elif membership == "join":
+            logger.info(f"Puppet 用户 {state_key} 加入房间 {room_id}")
+            # 这里可以根据需要实现：如果 Portal 之前被禁用，现在重新激活
+            # 但通常 Portal 是在创建房间时一起创建的
+
 
 
 # ============================================================================

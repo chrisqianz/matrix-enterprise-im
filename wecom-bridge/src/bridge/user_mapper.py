@@ -113,7 +113,7 @@ class UserMapper:
         if database_url is None:
             database_url = os.getenv(
                 "DATABASE_URL", 
-                "postgresql://wecom:***@postgres-wecom/wecom"
+                "postgresql://wecom:password@postgres-wecom/wecom"
             )
         
         self.engine = create_engine(database_url, pool_pre_ping=True)
@@ -431,7 +431,7 @@ class UserMapper:
                     mapping.wecom_external_userid = external_userid
                     mapping.wecom_unionid = unionid
                     mapping.is_external = True
-                    mapping.wecom_agentid=***
+                    mapping.wecom_agentid = agentid
                     if nickname:
                         mapping.nickname = nickname
                     if avatar_url:
